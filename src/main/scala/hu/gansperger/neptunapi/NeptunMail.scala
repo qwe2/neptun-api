@@ -1,3 +1,6 @@
 package hu.gansperger.neptunapi
 
-case class NeptunMail(id: String, read: Boolean, subject: String, sender: String, date: String)
+import com.github.nscala_time.time.Imports._
+
+case class NeptunMailPreview(id: String, read: Boolean, subject: String, sender: String, date: DateTime)
+case class NeptunMail(subject: String, sender: String, sendDate: DateTime, dueDate: DateTime, receivers: String, message: String)

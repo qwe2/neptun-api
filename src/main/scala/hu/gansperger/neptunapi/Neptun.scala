@@ -1,5 +1,4 @@
 package hu.gansperger.neptunapi
-
 import dispatch._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.collection.JavaConverters._
@@ -11,27 +10,30 @@ import java.util.regex.Pattern
 import org.jsoup.nodes.Element
 import org.jsoup.select.Elements
 
+import scala.annotation.tailrec
+
 object Neptun {
-  def apply(session: Session) = new Neptun(session)
-  def apply(URL: String) = new Neptun(URL)
+  def apply[T <: NeptunState](handler: NeptunHandler, neptunConfig: NeptunConfig = DefaultConfig) =
+    new Neptun[T](handler, neptunConfig)
 }
 
-class Neptun(session: Session) {
-  def this(URL: String) = this(Session(URL, Nil))
+class Neptun[T <: NeptunState](val handler: NeptunHandler, neptunConfig: NeptunConfig = DefaultConfig) {
 
-  private def addCookies(req: Req) = session.cookies.foldLeft(req){
+  private[this] val URL = handler.session.URL
+
+  private[this] def addCookies(req: Req) = handler.session.cookies.foldLeft(req) {
       case (r, c) =>
         r.addCookie(c)
   }
 
-  private def addUserAgent(req: Req) =
+  private[this] def addUserAgent(req: Req) =
     req <:< Map(("User-Agent","Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:27.0) Gecko/20100101 Firefox/27.0"))
 
-  def login(neptunCode: String, password: String): Try[Neptun] = {
+  def login(neptunCode: String, password: String)(implicit ev: T  <:< LoginableState): Try[Neptun[LoggedInState]] = {
     Try {
-      val PostMessage(path, body) = Defaults.login(neptunCode, password)
+      val PostStringMessage(path, body) = neptunConfig.login(neptunCode, password)
       val myReq =
-        host(s"${session.URL}/$path").POST.secure <:< Map(("Content-Type","application/json; charset=utf-8")) << body
+        host(s"$URL/$path").POST.secure <:< Map(("Content-Type","application/json; charset=utf-8")) << body
 
       val (respBody, cookies) = Http(myReq OK as.Response(
         x => (x.getResponseBody.replaceAll("\\\\u0027","\'"), x.getCookies.asScala))).apply()
@@ -40,7 +42,7 @@ class Neptun(session: Session) {
 
       error match {
         case Some("True") =>
-          Neptun(Session(session.URL, cookies.toList))
+          new Neptun[LoggedInState](handler.addCookies(cookies.toList), neptunConfig)
         case Some("False") =>
           throw new LoginException(errorMsg.get)
         case _ =>
@@ -49,67 +51,41 @@ class Neptun(session: Session) {
     }
   }
 
-  def sendPopupState(): Try[Neptun] = {
+  /*def sendPopupState(): Try[Neptun] = {
     Try {
       val PostMessage(path, body) = Defaults.savePopupState("hidden",
         "upFunction_c_messages_upModal_modalextenderReadMessage")
 
       val myReq =
-        addCookies(host(session.URL) / path).POST.secure <:< Map(("Content-Type","application/json; charset=utf-8")) << body
+        addCookies(host(URL) / path).POST.secure <:< Map(("Content-Type","application/json; charset=utf-8")) << body
 
       Http(myReq OK as.Response(identity))
 
       this
     }
-  }
+  }*/
 
-  def callMain(): Try[Neptun] = {
+  def callMain(implicit ev: T <:< LoggedInState) : Try[Neptun[MainCalledState]] = {
     Try {
-      val GetMessage(path, parameters) = Defaults.getMain
-
-      val myReq = addCookies(addUserAgent(host(session.URL) / path).setFollowRedirects(true).secure)
-
+      val GetMessage(path, _) = neptunConfig.getMain
+      val myReq = addCookies(addUserAgent(host(URL) / path).setFollowRedirects(true).secure)
       Http(myReq OK as.Response{x => logToFile(x.getResponseBody); x}).apply()
 
-      this
+      new Neptun[MainCalledState](handler, neptunConfig)
     }
-
   }
 
-  private def parseMail(raw: Element): NeptunMail = {
-    val id = raw.id().substring(4)
-    val read = raw.getElementsByTag("img").last().attr("alt") match {
-      case "Elolvasott üzenet" => true
-      case _ => false
-    }
-    val subject = raw.children().get(6).text()
-    val sender = raw.children().get(4).text()
-    val date = raw.children().get(7).text()
-
-    NeptunMail(id, read, subject, sender, date)
+  def fetchMails(page: Int)(implicit ev: T <:< MainCalledState) : handler.MessageType = {
+      val GetMessage(path, parameters) = neptunConfig.getMessagesPage(page)
+      val myReq = addCookies(addUserAgent(host(URL) / path)).setFollowRedirects(true).secure <<? parameters
+      Http(myReq OK as.Response(handler.handleMessages)).apply()
   }
 
-  def fetchMails() = {
-    def messagesToList(itr: java.util.Iterator[Element], acc: List[NeptunMail]): List[NeptunMail] =
-      if(itr.hasNext) {
-        val next = itr.next()
-        messagesToList(itr, acc :+ parseMail(next))
-      }
-      else acc
-
-    val GetMessage(path, parameters) = Defaults.getMessages
-
-    val myReq = addCookies(host(session.URL) / path).setFollowRedirects(true).secure <<? parameters
-
-    val resp = Http(myReq OK as.Response{x =>
-      logToFile(x.getResponseBody)
-      val doc = Jsoup.parse(x.getResponseBody)
-      val table = doc.getElementById("c_messages_gridMessages_bodytable")
-      messagesToList(table.getElementsByAttributeValueMatching("id", Pattern.compile("tr__[0-9]+")).iterator(), Nil)
-    }).apply()
-
-    resp
+  def getSingleMail(id: Int)(implicit ev: T <:< MainCalledState) : handler.MailType = {
+    val PostMessage(path, parameters) = neptunConfig.getSingleMail(id)
+    val myReq = addUserAgent(addCookies(host(s"$URL/$path"))).POST.secure <:< Map(("X-Requested-With","XMLHttpRequest"),
+      ("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")) << parameters
+    Http(myReq OK as.Response(handler.handleSingleMail)).apply()
   }
-
 
 }

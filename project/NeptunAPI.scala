@@ -14,7 +14,8 @@ object NeptunAPI extends Build {
       resolvers += "Typesafe Releases" at "http://repo.typesafe.com/typesafe/releases",
       libraryDependencies ++= Seq(
         "net.databinder.dispatch" %% "dispatch-core" % "0.11.0",
-        "com.typesafe.play" %% "play-json" % "2.2.1"
+        "com.typesafe.play" %% "play-json" % "2.2.1",
+        "com.github.nscala-time" %% "nscala-time" % "0.8.0"
       )
     )
   )
