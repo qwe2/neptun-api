@@ -1,6 +1,7 @@
 package hu.gansperger.neptunapi
 
-import com.ning.http.client.{Cookie, Response}
+import com.ning.http.client.cookie.Cookie
+import com.ning.http.client.Response
 import org.jsoup.nodes.Element
 import java.util.regex.Pattern
 import org.jsoup.Jsoup

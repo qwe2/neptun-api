@@ -13,8 +13,6 @@ trait NeptunConfig {
 
   val getMain: GetMessage
   //val savePopupState: (Any*) => PostMessage
-
-
 }
 
 object DefaultConfig extends NeptunConfig {
@@ -24,7 +22,7 @@ object DefaultConfig extends NeptunConfig {
   private[this] val mainPage = "main.aspx"
 
   override def login(neptunCode: String, password: String): PostStringMessage =
-    PostStringMessage("login.aspx/CheckLoginEnable", """{"user":"%s","pwd":"%s","UserLogin":null, "GUID":null}""" format (neptunCode, password))
+    PostStringMessage("login.aspx/CheckLoginEnable", s"""{"user":"$neptunCode","pwd":"$password","UserLogin":null, "GUID":null}""")
 
   override def getMessages: GetMessage = GetMessage(mainPage, Map.empty)
 

@@ -1,6 +1,6 @@
 package hu.gansperger
 
-import com.ning.http.client.Cookie
+import com.ning.http.client.cookie.Cookie
 import java.io.{PrintWriter, BufferedOutputStream, File}
 import com.github.nscala_time.time.Imports._
 
