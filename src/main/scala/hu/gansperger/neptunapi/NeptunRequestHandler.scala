@@ -1,11 +1,15 @@
 package hu.gansperger.neptunapi
 
-import hu.gansperger.neptunapi.Constants.Message
+import com.ning.http.client.cookie.Cookie
 
-trait NeptunConfig {
+trait NeptunRequestHandler {
+  val session : Session
+
   val defaultPageSize: Int = 20
   val defaultSort1: String = ""
   val defaultSort2: String = ""
+
+  def addCookies(cookies: List[Cookie]): NeptunRequestHandler
 
   def login(neptunCode: String, password: String): PostStringMessage
   def getMessages: GetMessage
@@ -17,11 +21,14 @@ trait NeptunConfig {
   //val savePopupState: (Any*) => PostMessage
 }
 
-object DefaultConfig extends NeptunConfig {
+class DefaultRequestHandler(override val session : Session) extends NeptunRequestHandler {
   import Constants._
 
   override val defaultPageSize: Int = 100
   override val defaultSort1: String = sortDesc(sendDate)
+
+  override def addCookies(cookies: List[Cookie]): NeptunRequestHandler =
+    new DefaultRequestHandler(Session(session.URL, cookies))
 
   override def login(neptunCode: String, password: String): PostStringMessage =
     PostStringMessage(URL.login, Payload.login(neptunCode, password))
@@ -46,6 +53,7 @@ object DefaultConfig extends NeptunConfig {
         Request.searchCol(Message.searchCol),
         Request.allowSubRows(Message.allowSubRows)
       )
+    )
 
   override def getSingleMail(id: Int): PostMessage =
     PostMessage(URL.main, Payload.eventTarget(Message.eventTarget, Message.eventArg(id)))
@@ -54,8 +62,6 @@ object DefaultConfig extends NeptunConfig {
 
   /*override val savePopupState: (Any*) => PostMessage = PostMessageFactory("main.aspx/SavePopupState",
     """{"state":"%s","PopupID":"%s"}""") _*/
-
-  ///TODO delete this shit
-  val elteNeptun = new ElteNeptun(Session("hallgato.neptun.elte.hu", Nil))
-  val defNeptun = Neptun(elteNeptun)
 }
+
+class ElteRequestHandler() extends DefaultRequestHandler(Session("hallgato.neptun.elte.hu", Nil))

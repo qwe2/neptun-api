@@ -2,7 +2,7 @@ package hu.gansperger.neptunapi
 
 import com.github.nscala_time.time.Imports._
 
-trait NeptunState
+sealed trait NeptunState
 trait BaseState extends NeptunState
 trait LoggedInState extends NeptunState
 trait MainCalledState extends LoggedInState

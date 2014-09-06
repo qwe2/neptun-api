@@ -13,6 +13,7 @@ object NeptunAPI extends Build {
       scalaVersion := "2.11.2",
       resolvers += "Typesafe Releases" at "http://repo.typesafe.com/typesafe/releases",
       libraryDependencies ++= Seq(
+        "org.scalatest" % "scalatest_2.11" % "2.2.1" % "test",
         "net.databinder.dispatch" %% "dispatch-core" % "0.11.2",
         "com.typesafe.play" %% "play-json" % "2.3.3",
         "com.github.nscala-time" %% "nscala-time" % "1.2.0",

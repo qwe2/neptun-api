@@ -1,4 +1,5 @@
 package hu.gansperger.neptunapi
+
 import dispatch._
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.collection.JavaConverters._
@@ -13,15 +14,18 @@ import org.jsoup.select.Elements
 import scala.annotation.tailrec
 
 object Neptun {
-  def apply[T <: NeptunState](handler: NeptunHandler, neptunConfig: NeptunConfig = DefaultConfig) =
-    new Neptun[T](handler, neptunConfig)
+  def apply(requestHandler: NeptunRequestHandler,
+            responseHandler: NeptunResponseHandler) =
+    new Neptun[LoginableState](requestHandler, responseHandler)
 }
 
-class Neptun[T <: NeptunState](val handler: NeptunHandler, neptunConfig: NeptunConfig = DefaultConfig) {
+class Neptun[T <: NeptunState] private (requestHandler: NeptunRequestHandler,
+                                        responseHandler: NeptunResponseHandler) {
 
-  private[this] val URL = handler.session.URL
+  private[this] val session = requestHandler.session
+  private[this] val URL = session.URL
 
-  private[this] def addCookies(req: Req) = handler.session.cookies.foldLeft(req) {
+  private[this] def addCookies(req: Req) = session.cookies.foldLeft(req) {
       case (r, c) =>
         r.addCookie(c)
   }
@@ -30,7 +34,7 @@ class Neptun[T <: NeptunState](val handler: NeptunHandler, neptunConfig: NeptunC
     req <:< Map(("User-Agent","Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:27.0) Gecko/20100101 Firefox/27.0"))
 
   def login(neptunCode: String, password: String)(implicit ev: T  <:< LoginableState): Future[Neptun[LoggedInState]] = {
-    val PostStringMessage(path, body) = neptunConfig.login(neptunCode, password)
+    val PostStringMessage(path, body) = requestHandler.login(neptunCode, password)
     val myReq =
       host(s"$URL/$path").POST.secure <:< Map(("Content-Type","application/json; charset=utf-8")) << body
 
@@ -43,7 +47,7 @@ class Neptun[T <: NeptunState](val handler: NeptunHandler, neptunConfig: NeptunC
 
       error match {
         case Some("True") =>
-          Neptun[LoggedInState](handler.addCookies(cookies.toList), neptunConfig)
+          new Neptun[LoggedInState](requestHandler.addCookies(cookies.toList), responseHandler)
         case Some("False") =>
           throw new LoginException(errorMsg.get)
         case _ =>
@@ -66,24 +70,23 @@ class Neptun[T <: NeptunState](val handler: NeptunHandler, neptunConfig: NeptunC
     }
   }*/
 
-  def callMain(implicit ev: T <:< LoggedInState) : Future[Neptun[MainCalledState]] = {
-      val GetMessage(path, _) = neptunConfig.getMain
+  def callMain()(implicit ev: T <:< LoggedInState) : Future[Neptun[MainCalledState]] = {
+      val GetMessage(path, _) = requestHandler.getMain
       val myReq = addCookies(addUserAgent(host(URL) / path).setFollowRedirects(true).secure)
-      Http(myReq OK as.Response{x => logToFile(x.getResponseBody); x})
-        .map( _ => Neptun[MainCalledState](handler, neptunConfig))
+      Http(myReq OK as.Response(_ => new Neptun[MainCalledState](requestHandler, responseHandler)))
   }
 
-  def fetchMails(page: Int)(implicit ev: T <:< MainCalledState) : Future[handler.MessageType] = {
-      val GetMessage(path, parameters) = neptunConfig.getMessagesPage(page)
+  def fetchMails(page: Int)(implicit ev: T <:< MainCalledState) : Future[MessageListType] = {
+      val GetMessage(path, parameters) = requestHandler.getMessagesPage(page)
       val myReq = addCookies(addUserAgent(host(URL) / path)).setFollowRedirects(true).secure <<? parameters
-      Http(myReq OK as.Response(handler.handleMessages))
+      Http(myReq OK as.Response(responseHandler.handleMessages))
   }
 
-  def getSingleMail(id: Int)(implicit ev: T <:< MainCalledState) : Future[handler.MailType] = {
-    val PostMessage(path, parameters) = neptunConfig.getSingleMail(id)
+  def getSingleMail(id: Int)(implicit ev: T <:< MainCalledState) : Future[MessageType] = {
+    val PostMessage(path, parameters) = requestHandler.getSingleMail(id)
     val myReq = addUserAgent(addCookies(host(s"$URL/$path"))).POST.secure <:< Map(("X-Requested-With","XMLHttpRequest"),
       ("Content-Type", "application/x-www-form-urlencoded; charset=utf-8")) << parameters
-    Http(myReq OK as.Response(handler.handleSingleMail))
+    Http(myReq OK as.Response(responseHandler.handleSingleMail))
   }
 
 }
