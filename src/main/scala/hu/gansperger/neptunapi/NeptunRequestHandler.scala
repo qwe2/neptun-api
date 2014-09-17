@@ -1,6 +1,7 @@
 package hu.gansperger.neptunapi
 
 import com.ning.http.client.cookie.Cookie
+import hu.gansperger.neptunapi.constants.{URL, Payload, MessageList, Request, Message}
 
 trait NeptunRequestHandler {
   val session : Session
@@ -21,8 +22,8 @@ trait NeptunRequestHandler {
   //val savePopupState: (Any*) => PostMessage
 }
 
-class DefaultRequestHandler(override val session : Session) extends NeptunRequestHandler {
-  import Constants._
+class DefaultRequestHandler()(override implicit val session : Session) extends NeptunRequestHandler {
+  import MessageList._
 
   override val defaultPageSize: Int = 100
   override val defaultSort1: String = sortDesc(sendDate)

@@ -77,6 +77,9 @@ class Neptun[T <: NeptunState] private (requestHandler: NeptunRequestHandler,
   }
 
   def fetchMails(page: Int)(implicit ev: T <:< MainCalledState) : Future[MessageListType] = {
+      for {
+        doc <- requestHandler.getMessagePage(page)
+      } yield responseHandler.handleMessages(doc)
       val GetMessage(path, parameters) = requestHandler.getMessagesPage(page)
       val myReq = addCookies(addUserAgent(host(URL) / path)).setFollowRedirects(true).secure <<? parameters
       Http(myReq OK as.Response(responseHandler.handleMessages))

@@ -1,7 +1,8 @@
 package hu.gansperger.neptunapi.transformers
 
 import java.util.regex.Pattern
-import hu.gansperger.neptunapi.{NeptunMailPreview, MessageListType}
+import hu.gansperger.neptunapi.MessageListType
+import hu.gansperger.neptunapi.data.NeptunMailPreview
 import org.jsoup.nodes.{Element, Document}
 import scala.collection.JavaConverters._
 import hu.gansperger.neptunapi.Implicits._

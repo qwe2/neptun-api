@@ -1,6 +1,7 @@
 package hu.gansperger.neptunapi.transformers
 
-import hu.gansperger.neptunapi.{NeptunMail, MessageType}
+import hu.gansperger.neptunapi.MessageType
+import hu.gansperger.neptunapi.data.NeptunMail
 import org.jsoup.nodes.Document
 import hu.gansperger.neptunapi.Implicits._
 
@@ -23,10 +24,11 @@ class MessageTransformer(doc : Document) extends Transformer[MessageType] {
     val sender = getRow(1)
     val sendDate = getRow(2).toDate
     val dueDate = getRow(3).toDateOption
-    val receivers = doc.getElementById(recId).text()
+    val receivers = doc.getElementById(recId).text().split(";").map(_.trim).toList
+    val isMore = doc.getElementById("Readmessage1_linkMegmutat") != null
 
     val message = doc.getElementById(readId).html()
 
-    NeptunMail(subject, sender, sendDate, dueDate, receivers, message)
+    NeptunMail(subject, sender, sendDate, dueDate, receivers, message, isMore)
   }
 }
