@@ -10,12 +10,12 @@ trait Request[T] {
 
 trait SessionRequest[T] extends Request[T] {
   val session : Session
-  val baseRequest =
+  def baseRequest =
       host(session.URL)
         .setUserAgent(session.userAgent)
         .addCookies(session.cookies)
 }
 
 trait SecureRequest[T] extends SessionRequest[T] {
-  override val baseRequest = super.baseRequest.secure
+  override def baseRequest = super.baseRequest.secure
 }

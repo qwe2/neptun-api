@@ -5,6 +5,13 @@ import hu.gansperger.neptunapi.{LoginException, Session}
 import hu.gansperger.neptunapi.constants.{Payload, URL}
 import scala.collection.JavaConverters._
 
+import scala.concurrent.ExecutionContext.Implicits.global
+
+object LoginRequest {
+  def apply(neptunCode : String, password : String)(implicit session : Session) =
+    new LoginRequest(neptunCode, password)
+}
+
 class LoginRequest(neptunCode : String,
                    password : String)(
                    override implicit val session : Session) extends SecureRequest[Session] {
@@ -15,7 +22,7 @@ class LoginRequest(neptunCode : String,
   override def request() : Future[Session] = {
     val request =
       (baseRequest / URL.login)
-        .setContentType("application/json", "charset=utf-8")
+        .setContentType("application/json", "utf-8")
         .POST << Payload.login(neptunCode, password)
 
     for {
@@ -37,3 +44,4 @@ class LoginRequest(neptunCode : String,
     }
   }
 }
+

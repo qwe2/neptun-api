@@ -1,68 +1,58 @@
 package hu.gansperger.neptunapi
 
-import com.ning.http.client.cookie.Cookie
-import hu.gansperger.neptunapi.constants.{URL, Payload, MessageList, Request, Message}
+import com.ning.http.client.Response
+import dispatch.Future
+import hu.gansperger.neptunapi.constants.MessageList._
+import hu.gansperger.neptunapi.constants._
+import hu.gansperger.neptunapi.requests.{MainRequest, MessageListRequest, LoginRequest}
+
+import scala.concurrent.ExecutionContext.Implicits.global
 
 trait NeptunRequestHandler {
-  val session : Session
+  protected[this] val session : Session
 
-  val defaultPageSize: Int = 20
-  val defaultSort1: String = ""
-  val defaultSort2: String = ""
+  protected[this] val defaultPageSize : Int
+  protected[this] val defaultSort1 : String
+  protected[this] val defaultSort2 : String
 
-  def addCookies(cookies: List[Cookie]): NeptunRequestHandler
+  def login(neptunCode: String, password: String) : Future[Session]
 
-  def login(neptunCode: String, password: String): PostStringMessage
-  def getMessages: GetMessage
-  def getMessagesPage(page: Int, pageSize: Int = defaultPageSize, sort1: String = defaultSort1, sort2: String = defaultSort2): GetMessage
+  def getMain() : Future[Unit]
 
-  def getSingleMail(id: Int): PostMessage
+  def getMessagesPage(page: Int,
+                      pageSize: Int = defaultPageSize,
+                      sort1: String = defaultSort1,
+                      sort2: String = defaultSort2): Future[Response]
+//
+//  def getSingleMail(id: Int): PostMessage
+//
+//  val getMain: GetMessage
+//  //val savePopupState: (Any*) => PostMessage
 
-  val getMain: GetMessage
-  //val savePopupState: (Any*) => PostMessage
+  def withSession(session : Session) : NeptunRequestHandler
 }
 
-class DefaultRequestHandler()(override implicit val session : Session) extends NeptunRequestHandler {
-  import MessageList._
+class DefaultRequestHandler(override val session : Session) extends NeptunRequestHandler {
+  private[this] implicit val s = session
 
-  override val defaultPageSize: Int = 100
-  override val defaultSort1: String = sortDesc(sendDate)
+  override protected[this] val defaultPageSize = 100
+  override protected[this] val defaultSort1 = sortDesc(sendDate)
+  override protected[this] val defaultSort2 = ""
 
-  override def addCookies(cookies: List[Cookie]): NeptunRequestHandler =
-    new DefaultRequestHandler(Session(session.URL, cookies))
+  override def login(neptunCode : String, password : String) =
+    LoginRequest(neptunCode, password).request()
 
-  override def login(neptunCode: String, password: String): PostStringMessage =
-    PostStringMessage(URL.login, Payload.login(neptunCode, password))
-
-  override def getMessages: GetMessage = GetMessage(URL.main, Map.empty)
+  override def getMain() : Future[Unit] =
+    MainRequest().request()
 
   override def getMessagesPage(page: Int,
                                pageSize: Int = defaultPageSize,
                                sort1: String = defaultSort1,
-                               sort2: String = defaultSort2): GetMessage =
-    GetMessage(URL.messagePage,
-      Map(
-        Request.requestType(Message.requestType),
-        Request.gridId(Message.gridId),
-        Request.pageIndex(page),
-        Request.pageSize(pageSize),
-        Request.sort1(sort1),
-        Request.sort2(sort2),
-        Request.fixedHeader(Message.fixedHeader),
-        Request.searchCol(Message.searchCol),
-        Request.searchText(Message.searchText),
-        Request.searchCol(Message.searchCol),
-        Request.allowSubRows(Message.allowSubRows)
-      )
-    )
+                               sort2: String = defaultSort2): Future[Response] =
+    MessageListRequest(page, pageSize, sort1, sort2).request()
 
-  override def getSingleMail(id: Int): PostMessage =
-    PostMessage(URL.main, Payload.eventTarget(Message.eventTarget, Message.eventArg(id)))
-
-  override val getMain = GetMessage(URL.main, Map.empty)
-
-  /*override val savePopupState: (Any*) => PostMessage = PostMessageFactory("main.aspx/SavePopupState",
-    """{"state":"%s","PopupID":"%s"}""") _*/
+  override def withSession(session : Session) =
+    new DefaultRequestHandler(session)
 }
 
-class ElteRequestHandler() extends DefaultRequestHandler(Session("hallgato.neptun.elte.hu", Nil))
+class ElteRequestHandler() extends DefaultRequestHandler(Session("hallgato.neptun.elte.hu", Nil, Misc.userAgent))

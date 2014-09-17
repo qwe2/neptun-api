@@ -47,3 +47,5 @@ com_crashlytics_export_strings.xml
 
 #sensitive test data
 /src/test
+Main.scala
+
